@@ -397,7 +397,7 @@ export default function App() {
       )}
 
       <footer>
-        Icons: maplestory.io (GMS v83) · Drops: Exodus client Monster Book ·
+        Icons: maplestory.io (GMS v83) · Drops: Monster Book ·
         rates approximated from drop_data (v83)
         <br />
         Built by <span className="footer-name">Maicon Lara - Pumpkin</span>
