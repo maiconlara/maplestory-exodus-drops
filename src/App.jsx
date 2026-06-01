@@ -1,10 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 
-const D = window.MAPLE_DATA || {
-  meta: { items: 0, pairs: 0, custom: 0, iconBase: "" },
-  mobs: {},
-  items: [],
-};
+import { D } from "./data.js";
 
 const MOB_ICON_BASE = (D.meta.iconBase || "").replace("/item/", "/mob/");
 const iconUrl = (id, kind) =>
