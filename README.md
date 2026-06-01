@@ -36,8 +36,8 @@ A Vercel detecta o framework **Vite** automaticamente (build = `vite build`, out
 ## Atualizar os dados
 Os dados saem do `drop_data` do V83. Para regerar:
 ```bash
-# na pasta do WZ/servidor (C:\Users\maico\Downloads\Data)
-python _build_item_data.py
+# na pasta do WZ/servidor 
+python _build_item_data.py #(arquivo no repo)
 # copie o resultado para este projeto:
 copy items_data.js ..\exodus-drops\public\items_data.js
 ```
