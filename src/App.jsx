@@ -75,7 +75,7 @@ function MobCard({ mob, onClick }) {
 }
 
 const LEGEND =
-  "≈ approximate rate (v83 baseline) · — drop confirmed by the Exodus book, rate unknown";
+  "≈ approximate rate (v83 baseline) · ? drop confirmed by the monster book, rate unknown";
 
 function ItemDetail({ it, onBack, onMob }) {
   return (
