@@ -18,6 +18,16 @@ function fmtPct(c) {
 const oneIn = (c) =>
   c == null ? "?" : "~1/" + Math.max(1, Math.round(1e6 / c)).toLocaleString();
 
+function fmtDate(iso) {
+  const [y, m, d] = String(iso || "").split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 const CATS = ["All", "Custom", "Equip", "Use", "Etc", "Setup", "Cash"];
 
 function Icon({ id, size, px, kind }) {
@@ -308,7 +318,12 @@ export default function App() {
   return (
     <div className="wrap">
       <header>
-        <h2>🍁 Exodus — Item Drop Browser</h2>
+        <h2>
+          Exodus — Item Drop Browser
+          {D.meta.updated ? (
+            <span className="updated">Updated {fmtDate(D.meta.updated)}</span>
+          ) : null}
+        </h2>
         <div className="modes">
           <button
             className={"mode" + (mode === "items" ? " on" : "")}
