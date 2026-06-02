@@ -318,12 +318,22 @@ export default function App() {
   return (
     <div className="wrap">
       <header>
-        <h2>
-          Exodus — Item Drop Browser
-          {D.meta.updated ? (
-            <span className="updated">Updated {fmtDate(D.meta.updated)}</span>
-          ) : null}
-        </h2>
+        <div className="topbar">
+          <h2>
+            Exodus — Item Drop Browser
+            {D.meta.updated ? (
+              <span className="updated">Updated {fmtDate(D.meta.updated)}</span>
+            ) : null}
+          </h2>
+          <a
+            className="vote"
+            href="https://exodusms.com/vote"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Vote for Exodus
+          </a>
+        </div>
         <div className="modes">
           <button
             className={"mode" + (mode === "items" ? " on" : "")}
