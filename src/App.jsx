@@ -30,6 +30,49 @@ function fmtDate(iso) {
 
 const CATS = ["All", "Custom", "Equip", "Use", "Etc", "Setup", "Cash"];
 
+// ---- Mob combat stats + elemental effectiveness (from D.mobStats) ----
+// Magic elements in canonical display order. Letters match the Exodus/Cosmic
+// `elemAttr` codes (server Element.getFromChar): S=Poison F=Fire I=Ice L=Lightning H=Holy.
+const MAGIC_ELEMS = [
+  ["S", "Poison"],
+  ["F", "Fire"],
+  ["I", "Ice"],
+  ["L", "Lightning"],
+  ["H", "Holy"],
+];
+// Effectiveness digit (server ElementalEffectiveness.getByNumber): 1=Immune 2=Strong 3=Weak.
+const EFF_BY_NUM = { 1: "Immune", 2: "Strong", 3: "Weak" };
+
+// Parse an elemAttr string like "I2F3" + the undead flag into the 4 buckets.
+function magicEffectiveness(el, undead) {
+  const present = {};
+  const s = String(el || "").toUpperCase();
+  for (let i = 0; i + 1 < s.length; i += 2) {
+    const n = Number(s[i + 1]);
+    if (n >= 1 && n <= 3) present[s[i]] = n;
+  }
+  const buckets = { Weak: [], Normal: [], Strong: [], Immune: [] };
+  for (const [ch, label] of MAGIC_ELEMS) {
+    const n = present[ch];
+    buckets[n ? EFF_BY_NUM[n] : "Normal"].push(label);
+  }
+  // Heal damages undead mobs -> undead are Weak to Heal; otherwise it has no effect (Normal).
+  buckets[undead ? "Weak" : "Normal"].push("Heal");
+  return buckets;
+}
+
+const num = (n) => (n == null ? "—" : Number(n).toLocaleString("en-US"));
+
+const STAT_PRIMARY = [["lv", "Level"], ["hp", "HP"], ["exp", "EXP"]];
+const STAT_SECONDARY = [
+  ["mp", "MP"],
+  ["pad", "Weapon Atk"],
+  ["mad", "Magic Atk"],
+  ["acc", "Accuracy"],
+  ["eva", "Avoidability"],
+  ["spd", "Speed"],
+];
+
 function Icon({ id, size, px, kind }) {
   const [err, setErr] = useState(false);
   if (err)
@@ -146,7 +189,58 @@ function ItemDetail({ it, onBack, onMob }) {
   );
 }
 
+function MagicTable({ st }) {
+  const b = magicEffectiveness(st.el, st.ud);
+  const ROWS = [
+    ["Weak", "Weak against (Magic)", "weak"],
+    ["Normal", "Normal against (Magic)", "normal"],
+    ["Strong", "Strong against (Magic)", "strong"],
+    ["Immune", "Immune to (Magic)", "immune"],
+  ];
+  return (
+    <div className="elembox">
+      {ROWS.map(([key, label, cls]) => (
+        <div className={"elemrow" + (b[key].length ? " " + cls : "")} key={key}>
+          <span className="elemk">{label}</span>
+          <span className={"elemv" + (b[key].length ? "" : " none")}>
+            {b[key].length ? b[key].join(", ") : "—"}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MobStats({ st }) {
+  const secondary = STAT_SECONDARY.filter(([k]) => st[k] != null);
+  return (
+    <div className="mobstats">
+      <div className="statgrid primary">
+        {STAT_PRIMARY.map(([k, label]) => (
+          <div className="stat" key={k}>
+            <div className="statk">{label}</div>
+            <div className="statv mono">{num(st[k])}</div>
+          </div>
+        ))}
+      </div>
+      {secondary.length > 0 && (
+        <div className="statgrid">
+          {secondary.map(([k, label]) => (
+            <div className="stat" key={k}>
+              <div className="statk">{label}</div>
+              <div className="statv mono">{num(st[k])}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="elemhd">Elemental effectiveness</div>
+      <MagicTable st={st} />
+    </div>
+  );
+}
+
 function MobDetail({ id, drops, onBack, onItem }) {
+  const st = D.mobStats ? D.mobStats[String(id)] : null;
   return (
     <div className="detail">
       <button className="back" onClick={onBack}>
@@ -155,13 +249,19 @@ function MobDetail({ id, drops, onBack, onItem }) {
       <div className="dhead">
         <Icon id={id} size={72} kind="mob" />
         <div>
-          <h1>{mobName(id)}</h1>
+          <h1>
+            {mobName(id)}
+            {st?.boss ? <span className="badge">BOSS</span> : null}
+            {st?.ud ? <span className="badge alt">UNDEAD</span> : null}
+          </h1>
           <div className="sub">
             Mob ID {id} · drops {drops.length} item
             {drops.length !== 1 ? "s" : ""}
+            {st ? " · Exodus stats" : ""}
           </div>
         </div>
       </div>
+      {st ? <MobStats st={st} /> : null}
       {drops.length === 0 ? (
         <div className="empty">No drop data.</div>
       ) : (

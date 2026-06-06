@@ -49,3 +49,24 @@ header h2{margin:0 0 10px}
 .legend{margin-top:12px;color:var(--dim);font-size:12px;line-height:1.6}
 .footer-name{color:var(--acc);font-weight:600; text-decoration:none; text-decoration-color: transparent; transition:text-decoration-color .2s}
 footer{text-align:center;color:var(--dim);font-size:12px;margin:24px 0}
+
+/* --- mob stats panel --- */
+.mobstats{margin-bottom:18px}
+.statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:8px;margin-bottom:8px}
+.statgrid.primary{grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:9px 12px}
+.statgrid.primary .stat{background:var(--panel2)}
+.statk{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.statv{font-size:15px;margin-top:3px}
+.statgrid.primary .statv{font-size:20px;font-weight:700;color:var(--acc)}
+.elemhd{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.03em;margin:14px 0 6px}
+.elembox{background:var(--panel);border:1px solid var(--bd);border-radius:10px;overflow:hidden}
+.elemrow{display:flex;justify-content:space-between;gap:14px;padding:8px 12px;border-bottom:1px solid var(--bd)}
+.elemrow:last-child{border-bottom:none}
+.elemk{color:var(--dim);font-size:13px}
+.elemv{font-weight:600;text-align:right}
+.elemv.none{color:var(--dim);font-weight:400}
+.elemrow.weak .elemv{color:#6ee787}    /* mob takes extra damage — good for you */
+.elemrow.strong .elemv{color:#f0a85a}  /* mob resists — reduced damage */
+.elemrow.immune .elemv{color:#ff6b6b}  /* mob takes no damage */
+.badge.alt{background:#6b46c1;color:#fff}
