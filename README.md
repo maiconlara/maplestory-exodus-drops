@@ -1,4 +1,4 @@
-# Exodus — Item Drop Browser
+# Exodus — Community Database
 
 Página React (Vite) para navegar os itens do servidor Exodus (base v83):
 busca por nome/ID, filtro por categoria, e página de item com **ícone + tabela de drop** (mob, %, taxa ~1/N, quantidade).

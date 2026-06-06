@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 
 import { D } from "./data.js";
 
@@ -263,7 +263,9 @@ function MobDetail({ id, drops, onBack, onItem }) {
       </div>
       {st ? <MobStats st={st} /> : null}
       {drops.length === 0 ? (
-        <div className="empty">No drop data.</div>
+        <div className="empty">
+          We couldn't find any drops for this monster.
+        </div>
       ) : (
         <table className="droptbl">
           <thead>
@@ -305,21 +307,65 @@ function MobDetail({ id, drops, onBack, onItem }) {
   );
 }
 
+function NotFound({ what, onBack }) {
+  return (
+    <div className="detail">
+      <button className="back" onClick={onBack}>
+        ← Back
+      </button>
+      <div className="empty">Couldn't find {what}.</div>
+    </div>
+  );
+}
+
+// Read the current location hash into a route: #/item/<id>, #/mob/<id>, else home.
+function parseHash() {
+  const m = (window.location.hash || "").match(/^#\/(item|mob)\/(\d+)/);
+  return m ? { kind: m[1], id: Number(m[2]) } : { kind: "home" };
+}
+
 export default function App() {
   const [mode, setMode] = useState("items");
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("All");
   const [page, setPage] = useState(0);
-  const [stack, setStack] = useState([]);
+  const [route, setRoute] = useState(parseHash);
+  const searchRef = useRef(null);
+  const navedRef = useRef(false); // navigated within the app vs. landed on a deep link?
   const PER = 60;
 
-  const itemById = useMemo(
-    () => new Map(D.items.map((it) => [it.id, it])),
-    [],
-  );
+  // Hash routing: every item/mob gets a shareable URL (#/item/<id>, #/mob/<id>).
+  useEffect(() => {
+    const onHash = () => {
+      const r = parseHash();
+      setRoute(r);
+      if (r.kind !== "home") window.scrollTo(0, 0); // keep list scroll when going back
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  const goItem = (id) => {
+    navedRef.current = true;
+    window.location.hash = `#/item/${id}`;
+  };
+  const goMob = (id) => {
+    navedRef.current = true;
+    window.location.hash = `#/mob/${id}`;
+  };
+  const goHome = () => {
+    window.location.hash = "#/";
+  };
+  // Back = normal browser-history navigation; only fall back to the list when the page was
+  // opened directly as a shared deep link (so Back never dumps you off the site).
+  const goBack = () => {
+    if (navedRef.current) window.history.back();
+    else goHome();
+  };
+
+  const itemById = useMemo(() => new Map(D.items.map((it) => [it.id, it])), []);
 
   // Invert items -> per-mob drop list (built once, in the browser)
-  const { mobIndex, mobList } = useMemo(() => {
+  const mobIndex = useMemo(() => {
     const idx = {};
     for (const it of D.items) {
       for (const d of it.d) {
@@ -341,11 +387,21 @@ export default function App() {
           dispName(a).localeCompare(dispName(b)),
       );
     }
-    const list = Object.keys(idx)
-      .map((mid) => ({ id: Number(mid), name: mobName(mid), n: idx[mid].length }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-    return { mobIndex: idx, mobList: list };
+    return idx;
   }, []);
+
+  // Every mob in the client (droppers + the ones with no book drops), sorted by name.
+  const mobList = useMemo(
+    () =>
+      Object.keys(D.mobs)
+        .map((mid) => ({
+          id: Number(mid),
+          name: mobName(mid),
+          n: (mobIndex[mid] || []).length,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [mobIndex],
+  );
 
   const filteredItems = useMemo(() => {
     const s = q.trim().toLowerCase();
@@ -372,44 +428,53 @@ export default function App() {
 
   const switchMode = (m) => {
     setMode(m);
-    setStack([]);
     setQ("");
     setCat("All");
     setPage(0);
   };
-  const push = (sel) => {
-    setStack((s) => [...s, sel]);
-    window.scrollTo(0, 0);
-  };
-  const back = () => setStack((s) => s.slice(0, -1));
-  const openItemById = (itemId) => {
-    const full = itemById.get(itemId);
-    if (full) push({ kind: "item", it: full });
-  };
 
-  const cur = stack[stack.length - 1] || null;
+  // Keep the tab title in sync with the current page (nicer shared links / history).
+  useEffect(() => {
+    let t = "Exodus — Community Database";
+    if (route.kind === "item") {
+      const it = itemById.get(route.id);
+      if (it) t = `${dispName(it)} — Exodus`;
+    } else if (route.kind === "mob") {
+      t = `${mobName(route.id)} — Exodus`;
+    }
+    document.title = t;
+  }, [route, itemById]);
 
-  if (cur?.kind === "item")
+  // Detail views are driven by the URL hash; Back always returns to the initial list route.
+  if (route.kind === "item") {
+    const it = itemById.get(route.id);
     return (
       <div className="wrap">
-        <ItemDetail
-          it={cur.it}
-          onBack={back}
-          onMob={(mid) => push({ kind: "mob", id: mid })}
-        />
+        {it ? (
+          <ItemDetail it={it} onBack={goBack} onMob={goMob} />
+        ) : (
+          <NotFound what={`item #${route.id}`} onBack={goBack} />
+        )}
       </div>
     );
-  if (cur?.kind === "mob")
+  }
+  if (route.kind === "mob") {
+    const known = D.mobs[String(route.id)] || D.mobStats?.[String(route.id)];
     return (
       <div className="wrap">
-        <MobDetail
-          id={cur.id}
-          drops={mobIndex[cur.id] || []}
-          onBack={back}
-          onItem={openItemById}
-        />
+        {known ? (
+          <MobDetail
+            id={route.id}
+            drops={mobIndex[route.id] || []}
+            onBack={goBack}
+            onItem={goItem}
+          />
+        ) : (
+          <NotFound what={`mob #${route.id}`} onBack={goBack} />
+        )}
       </div>
     );
+  }
 
   const list = mode === "items" ? filteredItems : filteredMobs;
   const pages = Math.max(1, Math.ceil(list.length / PER));
@@ -420,7 +485,7 @@ export default function App() {
       <header>
         <div className="topbar">
           <h2>
-            Exodus — Item Drop Browser
+            Exodus — Community Database
             {D.meta.updated ? (
               <span className="updated">Updated {fmtDate(D.meta.updated)}</span>
             ) : null}
@@ -448,17 +513,33 @@ export default function App() {
             Mobs
           </button>
         </div>
-        <input
-          className="search"
-          autoFocus
-          placeholder={
-            mode === "items"
-              ? "Search by item name or ID…"
-              : "Search by mob name or ID…"
-          }
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
+        <div className="searchwrap">
+          <input
+            ref={searchRef}
+            className="search"
+            autoFocus
+            placeholder={
+              mode === "items"
+                ? "Search by item name or ID…"
+                : "Search by mob name or ID…"
+            }
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          {q && (
+            <button
+              className="clearbtn"
+              aria-label="Clear search"
+              title="Clear search"
+              onClick={() => {
+                setQ("");
+                searchRef.current?.focus();
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
         {mode === "items" && (
           <div className="chips">
             {CATS.map((c) => (
@@ -488,18 +569,10 @@ export default function App() {
         <div className="grid">
           {mode === "items"
             ? view.map((it) => (
-                <ItemCard
-                  key={it.id}
-                  it={it}
-                  onClick={() => push({ kind: "item", it })}
-                />
+                <ItemCard key={it.id} it={it} onClick={() => goItem(it.id)} />
               ))
             : view.map((m) => (
-                <MobCard
-                  key={m.id}
-                  mob={m}
-                  onClick={() => push({ kind: "mob", id: m.id })}
-                />
+                <MobCard key={m.id} mob={m} onClick={() => goMob(m.id)} />
               ))}
         </div>
       )}

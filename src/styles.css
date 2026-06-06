@@ -9,8 +9,11 @@ header h2{margin:0 0 10px}
 .topbar h2{margin:0}
 .vote{display:inline-block;padding:8px 16px;border-radius:9px;background:var(--acc);color:#1a1200;font-weight:700;text-decoration:none;font-size:14px;white-space:nowrap}
 .vote:hover{filter:brightness(1.08)}
-.search{width:100%;padding:11px 14px;border-radius:10px;border:1px solid var(--bd);background:var(--panel);color:var(--tx);font-size:15px;outline:none}
+.searchwrap{position:relative}
+.search{width:100%;padding:11px 38px 11px 14px;border-radius:10px;border:1px solid var(--bd);background:var(--panel);color:var(--tx);font-size:15px;outline:none}
 .search:focus{border-color:var(--acc)}
+.clearbtn{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:24px;height:24px;display:flex;align-items:center;justify-content:center;border:none;border-radius:50%;background:var(--panel2);color:var(--dim);cursor:pointer;font-size:12px;line-height:1;padding:0}
+.clearbtn:hover{background:var(--bd);color:var(--tx)}
 .chips{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
 .chip{padding:5px 12px;border-radius:20px;border:1px solid var(--bd);background:var(--panel);color:var(--dim);cursor:pointer;font-size:13px}
 .chip.on{background:var(--acc);color:#1a1200;border-color:var(--acc);font-weight:600}
