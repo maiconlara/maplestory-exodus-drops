@@ -73,6 +73,30 @@ const STAT_SECONDARY = [
   ["spd", "Speed"],
 ];
 
+// ---- Mob list filters ----
+// Weakness filter options [value, label]: letters are elemAttr codes; "Heal" uses the undead flag.
+const WEAK_FILTERS = [...MAGIC_ELEMS, ["Heal", "Heal"]];
+// Mob list sort keys [value, label].
+const MOB_SORTS = [
+  ["lv", "Level"],
+  ["exp", "EXP"],
+  ["hp", "HP"],
+];
+// True if a mob (raw elemAttr `el` + undead `ud`) is WEAK (digit 3) to the given filter value.
+function mobWeakTo(el, ud, key) {
+  if (key === "Heal") return !!ud;
+  const s = String(el || "").toUpperCase();
+  for (let i = 0; i + 1 < s.length; i += 2)
+    if (s[i] === key && s[i + 1] === "3") return true;
+  return false;
+}
+
+// Level filter buckets: 0–10, 11–20 … 141–150 (steps of 10), then one 151–200 bucket.
+// Mobs above level 200 (a few joke mobs) are intentionally not bucketed — they show under "All levels".
+const LV_RANGES = [[0, 10]];
+for (let s = 11; s <= 150; s += 10) LV_RANGES.push([s, s + 9]);
+LV_RANGES.push([151, 200]);
+
 function Icon({ id, size, px, kind }) {
   const [err, setErr] = useState(false);
   if (err)
@@ -103,7 +127,7 @@ function ItemCard({ it, onClick }) {
           {dispName(it)}
         </div>
         <div className="meta">
-          #{it.id} · {it.cat} · {it.d.length} mob{it.d.length !== 1 ? "s" : ""}
+          {it.cat} · {it.d.length} mob{it.d.length !== 1 ? "s" : ""}
           {it.cu ? <span className="badge">CUSTOM</span> : null}
         </div>
       </div>
@@ -120,7 +144,7 @@ function MobCard({ mob, onClick }) {
           {mob.name}
         </div>
         <div className="meta">
-          #{mob.id} · {mob.n} drop{mob.n !== 1 ? "s" : ""}
+          Lvl. {mob.lv} · {mob.n} drop{mob.n !== 1 ? "s" : ""}
         </div>
       </div>
     </button>
@@ -329,6 +353,11 @@ export default function App() {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("All");
   const [page, setPage] = useState(0);
+  const [mobType, setMobType] = useState("all"); // all | monster | boss
+  const [lvRange, setLvRange] = useState("all"); // "all" | index into LV_RANGES
+  const [weak, setWeak] = useState("all"); // "all" | element letter | "Heal"
+  const [sortKey, setSortKey] = useState("lv"); // name | lv | exp | hp (mobs default to level)
+  const [sortDir, setSortDir] = useState("asc"); // asc | desc
   const [route, setRoute] = useState(parseHash);
   const searchRef = useRef(null);
   const navedRef = useRef(false); // navigated within the app vs. landed on a deep link?
@@ -390,16 +419,23 @@ export default function App() {
     return idx;
   }, []);
 
-  // Every mob in the client (droppers + the ones with no book drops), sorted by name.
+  // Every mob in the client (droppers + the ones with no book drops), with stats for filters.
   const mobList = useMemo(
     () =>
-      Object.keys(D.mobs)
-        .map((mid) => ({
+      Object.keys(D.mobs).map((mid) => {
+        const st = (D.mobStats && D.mobStats[mid]) || {};
+        return {
           id: Number(mid),
           name: mobName(mid),
           n: (mobIndex[mid] || []).length,
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
+          lv: st.lv ?? 0,
+          exp: st.exp ?? 0,
+          hp: st.hp ?? 0,
+          el: st.el || "",
+          ud: st.ud ? 1 : 0,
+          boss: st.boss ? 1 : 0,
+        };
+      }),
     [mobIndex],
   );
 
@@ -418,29 +454,54 @@ export default function App() {
 
   const filteredMobs = useMemo(() => {
     const s = q.trim().toLowerCase();
-    if (!s) return mobList;
-    return mobList.filter(
-      (m) => m.name.toLowerCase().includes(s) || String(m.id).includes(s),
-    );
-  }, [q, mobList]);
+    const out = mobList.filter((m) => {
+      if (s && !(m.name.toLowerCase().includes(s) || String(m.id).includes(s)))
+        return false;
+      if (mobType === "boss" && !m.boss) return false;
+      if (mobType === "monster" && m.boss) return false;
+      if (lvRange !== "all") {
+        const [lo, hi] = LV_RANGES[Number(lvRange)] || [0, Infinity];
+        if (m.lv < lo || m.lv > hi) return false;
+      }
+      if (weak !== "all" && !mobWeakTo(m.el, m.ud, weak)) return false;
+      return true;
+    });
+    const dir = sortDir === "asc" ? 1 : -1;
+    out.sort((a, b) => {
+      const r =
+        sortKey === "name"
+          ? a.name.localeCompare(b.name)
+          : (a[sortKey] || 0) - (b[sortKey] || 0);
+      return r * dir || a.name.localeCompare(b.name);
+    });
+    return out;
+  }, [q, mobList, mobType, lvRange, weak, sortKey, sortDir]);
 
-  useEffect(() => setPage(0), [q, cat, mode]);
+  useEffect(
+    () => setPage(0),
+    [q, cat, mode, mobType, lvRange, weak, sortKey, sortDir],
+  );
 
   const switchMode = (m) => {
     setMode(m);
     setQ("");
     setCat("All");
     setPage(0);
+    setMobType("all");
+    setLvRange("all");
+    setWeak("all");
+    setSortKey("lv");
+    setSortDir("asc");
   };
 
   // Keep the tab title in sync with the current page (nicer shared links / history).
   useEffect(() => {
-    let t = "Exodus — Community Database";
+    let t = "Exodus | Community Database";
     if (route.kind === "item") {
       const it = itemById.get(route.id);
-      if (it) t = `${dispName(it)} — Exodus`;
+      if (it) t = `${dispName(it)} | Exodus`;
     } else if (route.kind === "mob") {
-      t = `${mobName(route.id)} — Exodus`;
+      t = `${mobName(route.id)} | Exodus`;
     }
     document.title = t;
   }, [route, itemById]);
@@ -551,6 +612,62 @@ export default function App() {
                 {c}
               </button>
             ))}
+          </div>
+        )}
+        {mode === "mobs" && (
+          <div className="mobfilters">
+            <select
+              className="filt"
+              value={mobType}
+              onChange={(e) => setMobType(e.target.value)}
+            >
+              <option value="all">All types</option>
+              <option value="monster">Monsters</option>
+              <option value="boss">Bosses</option>
+            </select>
+            <select
+              className="filt"
+              value={lvRange}
+              onChange={(e) => setLvRange(e.target.value)}
+            >
+              <option value="all">All levels</option>
+              {LV_RANGES.map((r, i) => (
+                <option key={i} value={i}>
+                  Lv {r[0]}–{r[1]}
+                </option>
+              ))}
+            </select>
+            <select
+              className="filt"
+              value={weak}
+              onChange={(e) => setWeak(e.target.value)}
+            >
+              <option value="all">Any weakness</option>
+              {WEAK_FILTERS.map(([val, label]) => (
+                <option key={val} value={val}>
+                  Weak: {label}
+                </option>
+              ))}
+            </select>
+            <select
+              className="filt"
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value)}
+            >
+              {MOB_SORTS.map(([val, label]) => (
+                <option key={val} value={val}>
+                  Sort: {label}
+                </option>
+              ))}
+            </select>
+            <button
+              className="dirbtn"
+              onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+              title={sortDir === "asc" ? "Ascending" : "Descending"}
+              aria-label="Toggle sort direction"
+            >
+              {sortDir === "asc" ? "↑" : "↓"}
+            </button>
           </div>
         )}
         <div className="count">
